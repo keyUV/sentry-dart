@@ -391,7 +391,7 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     val debugImages: List<DebugImage>? = options.debugImagesLoader.loadDebugImages()
 
     debugImages?.let {
-      it.forEach { image ->
+      for (val image in it) {
         val item = mutableMapOf<String, Any?>()
 
         item["image_addr"] = image.imageAddr
@@ -440,11 +440,15 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
   private fun addPackages(event: SentryEvent, sdk: SdkVersion?) {
     event.sdk?.let {
       if (it.name == flutterSdk) {
-        sdk?.packages?.forEach { sentryPackage ->
-          it.addPackage(sentryPackage.name, sentryPackage.version)
+        if (sdk?.packages != null) {
+          for (val sentryPackage in sdk?.packages!!) {
+            it.addPackage(sentryPackage.name, sentryPackage.version)
+          }
         }
-        sdk?.integrations?.forEach { integration ->
-          it.addIntegration(integration)
+        if (sdk?.integrations != null) {
+          for (val integration in sdk?.integrations!!) {
+            it.addIntegration(integration)
+          }
         }
       }
     }

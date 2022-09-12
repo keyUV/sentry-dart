@@ -22,15 +22,15 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 31
+    compileSdkVersion 33
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
     }
 
     defaultConfig {
-        minSdkVersion 16
-        targetSdkVersion 31
+        minSdkVersion 23
+        targetSdkVersion 33
 
         ndk {
             // Flutter does not currently support building for x86 Android (See Issue 9253).
