@@ -2,15 +2,69 @@
 
 ## Unreleased
 
+### Fixes
+
+- Handle traces sampler exception ([#1040](https://github.com/getsentry/sentry-dart/pull/1040))
+- tracePropagationTargets ignores invalid Regex ([#1043](https://github.com/getsentry/sentry-dart/pull/1043))
+
+### Features
+
+- Added [Flutter renderer](https://docs.flutter.dev/development/platform-integration/web/renderers) information to events ([#1035](https://github.com/getsentry/sentry-dart/pull/1035))
+
+## 6.11.2
+
+### Fixes
+
+- Tracer does not allow setting measurement if finished ([#1026](https://github.com/getsentry/sentry-dart/pull/1026))
+- Add missing measurements units ([#1033](https://github.com/getsentry/sentry-dart/pull/1033))
+
+### Features
+
+- Bump Cocoa SDK from v7.26.0 to v7.27.0 ([#1030](https://github.com/getsentry/sentry-dart/pull/1030))
+  - [changelog](https://github.com/getsentry/sentry-cocoa/blob/master/CHANGELOG.md#7270)
+  - [diff](https://github.com/getsentry/sentry-cocoa/compare/7.26.0...7.27.0)
+
+## 6.11.1
+
+### Fixes
+
+- Align span spec for serialize ops ([#1024](https://github.com/getsentry/sentry-dart/pull/1024))
+- Pin sentry version ([#1020](https://github.com/getsentry/sentry-dart/pull/1020))
+
+### Features
+
+- Bump Cocoa SDK from v7.25.1 to v7.26.0 ([#1023](https://github.com/getsentry/sentry-dart/pull/1023))
+  - [changelog](https://github.com/getsentry/sentry-cocoa/blob/master/CHANGELOG.md#7260)
+  - [diff](https://github.com/getsentry/sentry-cocoa/compare/7.25.1...7.26.0)
+
+## 6.11.0
+
+### Fixes
+
+- Scope cloning method was not setting the user ([#1013](https://github.com/getsentry/sentry-dart/pull/1013))
+
+### Features
+
+- Dynamic sampling ([#1004](https://github.com/getsentry/sentry-dart/pull/1004))
+- Set custom measurements on transactions ([#1011](https://github.com/getsentry/sentry-dart/pull/1011))
+
+## 6.10.0
+
+### Fixes
+
+- Capture Callback Exceptions ([#990](https://github.com/getsentry/sentry-dart/pull/990))
+- Allow routeNameExtractor to set transaction names ([#1005](https://github.com/getsentry/sentry-dart/pull/1005))
+
 ### Features
 
 - Prepare future support for iOS and macOS obfuscated app symbolication using dSYM (requires Flutter `master` channel) ([#823](https://github.com/getsentry/sentry-dart/pull/823))
-- Bump Android SDK from v6.3.1 to v6.4.1 ([#989](https://github.com/getsentry/sentry-dart/pull/989))
-  - [changelog](https://github.com/getsentry/sentry-java/blob/main/CHANGELOG.md#641)
-  - [diff](https://github.com/getsentry/sentry-java/compare/6.3.1...6.4.1)
-- Bump Cocoa SDK from v7.23.0 to v7.24.1 ([#993](https://github.com/getsentry/sentry-dart/pull/993), [#996](https://github.com/getsentry/sentry-dart/pull/996))
-  - [changelog](https://github.com/getsentry/sentry-cocoa/blob/master/CHANGELOG.md#7241)
-  - [diff](https://github.com/getsentry/sentry-cocoa/compare/7.23.0...7.24.1)
+- Bump Android SDK from v6.3.1 to v6.4.2 ([#989](https://github.com/getsentry/sentry-dart/pull/989), [#1009](https://github.com/getsentry/sentry-dart/pull/1009))
+  - [changelog](https://github.com/getsentry/sentry-java/blob/main/CHANGELOG.md#642)
+  - [diff](https://github.com/getsentry/sentry-java/compare/6.3.1...6.4.2)
+- Bump Cocoa SDK from v7.23.0 to v7.25.1 ([#993](https://github.com/getsentry/sentry-dart/pull/993), [#996](https://github.com/getsentry/sentry-dart/pull/996), [#1000](https://github.com/getsentry/sentry-dart/pull/1000), [#1007](https://github.com/getsentry/sentry-dart/pull/1007))
+  - [changelog](https://github.com/getsentry/sentry-cocoa/blob/master/CHANGELOG.md#7251)
+  - [diff](https://github.com/getsentry/sentry-cocoa/compare/7.23.0...7.25.1)
+- Dynamic sampling ([#1004](https://github.com/getsentry/sentry-dart/pull/1004))
 
 ## 6.9.1
 

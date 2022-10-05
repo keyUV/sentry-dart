@@ -1,5 +1,3 @@
-// ignore: implementation_imports
-import 'package:sentry/src/sentry_tracer.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../sentry_flutter.dart';
@@ -86,7 +84,7 @@ class SentryNavigatorObserver extends RouteObserver<PageRoute<dynamic>> {
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
 
-    _setCurrentRoute(route.settings.name);
+    _setCurrentRoute(route);
 
     _addBreadcrumb(
       type: 'didPush',
@@ -95,13 +93,14 @@ class SentryNavigatorObserver extends RouteObserver<PageRoute<dynamic>> {
     );
 
     _finishTransaction();
-    _startTransaction(route.settings.name, route.settings.arguments);
+    _startTransaction(route);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-    _setCurrentRoute(newRoute?.settings.name);
+
+    _setCurrentRoute(newRoute);
     _addBreadcrumb(
       type: 'didReplace',
       from: oldRoute?.settings,
@@ -113,7 +112,7 @@ class SentryNavigatorObserver extends RouteObserver<PageRoute<dynamic>> {
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
 
-    _setCurrentRoute(previousRoute?.settings.name);
+    _setCurrentRoute(previousRoute);
     _addBreadcrumb(
       type: 'didPop',
       from: route.settings,
@@ -121,10 +120,7 @@ class SentryNavigatorObserver extends RouteObserver<PageRoute<dynamic>> {
     );
 
     _finishTransaction();
-    _startTransaction(
-      previousRoute?.settings.name,
-      previousRoute?.settings.arguments,
-    );
+    _startTransaction(previousRoute);
   }
 
   void _addBreadcrumb({
@@ -140,7 +136,13 @@ class SentryNavigatorObserver extends RouteObserver<PageRoute<dynamic>> {
     ));
   }
 
-  Future<void> _setCurrentRoute(String? name) async {
+  String? _getRouteName(Route<dynamic>? route) {
+    return (_routeNameExtractor?.call(route?.settings) ?? route?.settings)
+        ?.name;
+  }
+
+  Future<void> _setCurrentRoute(Route<dynamic>? route) async {
+    final name = _getRouteName(route);
     if (name == null) {
       return;
     }
@@ -151,10 +153,14 @@ class SentryNavigatorObserver extends RouteObserver<PageRoute<dynamic>> {
     }
   }
 
-  Future<void> _startTransaction(String? name, Object? arguments) async {
+  Future<void> _startTransaction(Route<dynamic>? route) async {
     if (!_enableAutoTransactions) {
       return;
     }
+
+    String? name = _getRouteName(route);
+    final arguments = route?.settings.arguments;
+
     if (name == null) {
       return;
     }
@@ -162,19 +168,28 @@ class SentryNavigatorObserver extends RouteObserver<PageRoute<dynamic>> {
     if (name == '/') {
       name = 'root ("/")';
     }
-    _transaction = _hub.startTransaction(
+    final transactionContext = SentryTransactionContext(
       name,
       'navigation',
+      transactionNameSource: SentryTransactionNameSource.component,
+    );
+    _transaction = _hub.startTransactionWithContext(
+      transactionContext,
       waitForChildren: true,
       autoFinishAfter: _autoFinishAfter,
       trimEnd: true,
       onFinish: (transaction) async {
-        // ignore: invalid_use_of_internal_member
-        if (transaction is SentryTracer) {
-          final nativeFrames = await _native
-              .endNativeFramesCollection(transaction.context.traceId);
-          if (nativeFrames != null) {
-            transaction.addMeasurements(nativeFrames.toMeasurements());
+        final nativeFrames = await _native
+            .endNativeFramesCollection(transaction.context.traceId);
+        if (nativeFrames != null) {
+          final measurements = nativeFrames.toMeasurements();
+          for (final item in measurements.entries) {
+            final measurement = item.value;
+            transaction.setMeasurement(
+              item.key,
+              measurement.value,
+              unit: measurement.unit,
+            );
           }
         }
       },
@@ -266,11 +281,14 @@ class RouteObserverBreadcrumb extends Breadcrumb {
 }
 
 extension NativeFramesMeasurement on NativeFrames {
-  List<SentryMeasurement> toMeasurements() {
-    return [
-      SentryMeasurement.totalFrames(totalFrames),
-      SentryMeasurement.slowFrames(slowFrames),
-      SentryMeasurement.frozenFrames(frozenFrames),
-    ];
+  Map<String, SentryMeasurement> toMeasurements() {
+    final total = SentryMeasurement.totalFrames(totalFrames);
+    final slow = SentryMeasurement.slowFrames(slowFrames);
+    final frozen = SentryMeasurement.frozenFrames(frozenFrames);
+    return {
+      total.name: total,
+      slow.name: slow,
+      frozen.name: frozen,
+    };
   }
 }
