@@ -38,13 +38,17 @@ class OnErrorIntegration implements Integration<SentryFlutterOptions> {
     // WidgetsBinding works with WidgetsFlutterBinding and other custom bindings
     final wrapper = dispatchWrapper ??
         PlatformDispatcherWrapper(binding.platformDispatcher);
-
-    if (!wrapper.isOnErrorSupported(options)) {
-      return;
-    }
     _defaultOnError = wrapper.onError;
 
     _integrationOnError = (Object exception, StackTrace stackTrace) {
+      _options!.logger(
+        SentryLevel.error,
+        "Uncaught Platform Error",
+        logger: 'sentry.platformError',
+        exception: exception,
+        stackTrace: stackTrace,
+      );
+
       final handled = _defaultOnError?.call(exception, stackTrace) ?? true;
 
       // As per docs, the app might crash on some platforms
@@ -60,6 +64,8 @@ class OnErrorIntegration implements Integration<SentryFlutterOptions> {
       var event = SentryEvent(
         throwable: throwableMechanism,
         level: SentryLevel.fatal,
+        // ignore: invalid_use_of_internal_member
+        timestamp: options.clock(),
       );
 
       // unawaited future

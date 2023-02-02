@@ -21,6 +21,8 @@ class DioEventProcessor implements EventProcessor {
 
   final SentryOptions _options;
   final MaxRequestBodySize _maxRequestBodySize;
+  // Will be used again, see https://github.com/getsentry/sentry-dart/issues/624
+  // ignore: unused_field
   final MaxResponseBodySize _maxResponseBodySize;
 
   SentryExceptionFactory get _sentryExceptionFactory =>
@@ -34,11 +36,9 @@ class DioEventProcessor implements EventProcessor {
       return event;
     }
 
-    final response = _responseFrom(dioError);
-
     Contexts contexts = event.contexts;
     if (event.contexts.response == null) {
-      contexts = contexts.copyWith(response: response);
+      contexts = contexts.copyWith(response: _responseFrom(dioError));
     }
     // Don't override just parts of the original request.
     // Keep the original one or if there's none create one.
@@ -117,23 +117,13 @@ class DioEventProcessor implements EventProcessor {
 
   SentryRequest? _requestFrom(DioError dioError) {
     final options = dioError.requestOptions;
-    // As far as I can tell there's no way to get the uri without the query part
-    // so we replace it with an empty string.
-    final urlWithoutQuery = options.uri.replace(query: '').toString();
-
-    final query = options.uri.query.isEmpty ? null : options.uri.query;
-
     final headers = options.headers
         .map((key, dynamic value) => MapEntry(key, value?.toString() ?? ''));
 
-    return SentryRequest(
+    return SentryRequest.fromUri(
+      uri: options.uri,
       method: options.method,
       headers: _options.sendDefaultPii ? headers : null,
-      url: urlWithoutQuery,
-      queryString: query,
-      cookies: _options.sendDefaultPii
-          ? options.headers['Cookie']?.toString()
-          : null,
       data: _getRequestData(dioError.requestOptions.data),
     );
   }
@@ -155,7 +145,7 @@ class DioEventProcessor implements EventProcessor {
     return null;
   }
 
-  SentryResponse? _responseFrom(DioError dioError) {
+  SentryResponse _responseFrom(DioError dioError) {
     final response = dioError.response;
 
     final headers = response?.headers.map.map(
@@ -164,29 +154,8 @@ class DioEventProcessor implements EventProcessor {
 
     return SentryResponse(
       headers: _options.sendDefaultPii ? headers : null,
-      url: response?.realUri.toString(),
-      redirected: response?.isRedirect,
-      body: _getResponseData(dioError.response?.data),
+      bodySize: dioError.response?.data?.length as int?,
       statusCode: response?.statusCode,
-      status: response?.statusMessage,
     );
-  }
-
-  /// Returns the request data, if possible according to the users settings.
-  /// Type checks are based on DIOs [ResponseType].
-  Object? _getResponseData(dynamic data) {
-    if (!_options.sendDefaultPii) {
-      return null;
-    }
-    if (data is String) {
-      if (_maxResponseBodySize.shouldAddBody(data.codeUnits.length)) {
-        return data;
-      }
-    } else if (data is List<int>) {
-      if (_maxResponseBodySize.shouldAddBody(data.length)) {
-        return data;
-      }
-    }
-    return null;
   }
 }

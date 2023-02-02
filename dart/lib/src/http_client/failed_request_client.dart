@@ -72,12 +72,16 @@ class FailedRequestClient extends BaseClient {
     Client? client,
     Hub? hub,
   })  : _hub = hub ?? HubAdapter(),
-        _client = client ?? Client();
+        _client = client ?? Client() {
+    if (captureFailedRequests) {
+      _hub.options.sdk.addIntegration('HTTPClientError');
+    }
+  }
 
   final Client _client;
   final Hub _hub;
 
-  /// Configures wether to record exceptions for failed requests.
+  /// Configures whether to record exceptions for failed requests.
   /// Examples for captures exceptions are:
   /// - In an browser environment this can be requests which fail because of CORS.
   /// - In an mobile or desktop application this can be requests which failed
@@ -85,7 +89,7 @@ class FailedRequestClient extends BaseClient {
   final bool captureFailedRequests;
 
   /// Configures up to which size request bodies should be included in events.
-  /// This does not change wether an event is captured.
+  /// This does not change whether an event is captured.
   final MaxRequestBodySize maxRequestBodySize;
 
   /// Describes which HTTP status codes should be considered as a failed
@@ -101,12 +105,13 @@ class FailedRequestClient extends BaseClient {
     int? statusCode;
     Object? exception;
     StackTrace? stackTrace;
+    StreamedResponse? response;
 
     final stopwatch = Stopwatch();
     stopwatch.start();
 
     try {
-      final response = await _client.send(request);
+      response = await _client.send(request);
       statusCode = response.statusCode;
       return response;
     } catch (e, st) {
@@ -118,25 +123,24 @@ class FailedRequestClient extends BaseClient {
 
       // If captureFailedRequests is true, there statusCode is null.
       // So just one of these blocks can be called.
-
+      var capture = false;
+      String? reason;
       if (captureFailedRequests && exception != null) {
+        capture = true;
+      } else if (failedRequestStatusCodes.containsStatusCode(statusCode)) {
+        // Capture an exception if the status code is considered bad
+        capture = true;
+        reason = 'HTTP Client Error with status code: $statusCode';
+        exception ??= SentryHttpClientError(reason);
+      }
+      if (capture) {
         await _captureEvent(
           exception: exception,
           stackTrace: stackTrace,
           request: request,
           requestDuration: stopwatch.elapsed,
-        );
-      } else if (failedRequestStatusCodes.containsStatusCode(statusCode)) {
-        final message =
-            'Event was captured because the request status code was $statusCode';
-        final httpException = SentryHttpClientError(message);
-
-        // Capture an exception if the status code is considered bad
-        await _captureEvent(
-          exception: exception ?? httpException,
-          request: request,
-          reason: message,
-          requestDuration: stopwatch.elapsed,
+          response: response,
+          reason: reason,
         );
       }
     }
@@ -152,20 +156,14 @@ class FailedRequestClient extends BaseClient {
     String? reason,
     required Duration requestDuration,
     required BaseRequest request,
+    required StreamedResponse? response,
   }) async {
-    // As far as I can tell there's no way to get the uri without the query part
-    // so we replace it with an empty string.
-    final urlWithoutQuery = request.url.replace(query: '').toString();
-
-    final query = request.url.query.isEmpty ? null : request.url.query;
-
-    final sentryRequest = SentryRequest(
+    final sentryRequest = SentryRequest.fromUri(
       method: request.method,
       headers: sendDefaultPii ? request.headers : null,
-      url: urlWithoutQuery,
-      queryString: query,
-      cookies: sendDefaultPii ? request.headers['Cookie'] : null,
-      data: _getDataFromRequest(request),
+      uri: request.url,
+      data: sendDefaultPii ? _getDataFromRequest(request) : null,
+      // ignore: deprecated_member_use_from_same_package
       other: {
         'content_length': request.contentLength.toString(),
         'duration': requestDuration.toString(),
@@ -176,12 +174,32 @@ class FailedRequestClient extends BaseClient {
       type: 'SentryHttpClient',
       description: reason,
     );
-    final throwableMechanism = ThrowableMechanism(mechanism, exception);
+
+    bool? snapshot;
+    if (exception is SentryHttpClientError) {
+      snapshot = true;
+    }
+
+    final throwableMechanism = ThrowableMechanism(
+      mechanism,
+      exception,
+      snapshot: snapshot,
+    );
 
     final event = SentryEvent(
       throwable: throwableMechanism,
       request: sentryRequest,
+      timestamp: _hub.options.clock(),
     );
+
+    if (response != null) {
+      event.contexts.response = SentryResponse(
+        headers: sendDefaultPii ? response.headers : null,
+        bodySize: response.contentLength,
+        statusCode: response.statusCode,
+      );
+    }
+
     await _hub.captureEvent(event, stackTrace: stackTrace);
   }
 

@@ -41,7 +41,14 @@ class SentryAssetBundle implements AssetBundle {
     bool enableStructuredDataTracing = false,
   })  : _hub = hub ?? HubAdapter(),
         _bundle = bundle ?? rootBundle,
-        _enableStructuredDataTracing = enableStructuredDataTracing;
+        _enableStructuredDataTracing = enableStructuredDataTracing {
+    // ignore: invalid_use_of_internal_member
+    _hub.options.sdk.addIntegration('AssetBundleTracing');
+    if (_enableStructuredDataTracing) {
+      // ignore: invalid_use_of_internal_member
+      _hub.options.sdk.addIntegration('StructuredDataTracing');
+    }
+  }
 
   final Hub _hub;
   final AssetBundle _bundle;
@@ -212,6 +219,7 @@ class SentryAssetBundle implements AssetBundle {
 
   Future<ImmutableBuffer> _loadBuffer(String key) async {
     try {
+      // ignore: return_of_invalid_type
       return (_bundle as dynamic).loadBuffer(key);
     } on NoSuchMethodError catch (_) {
       // The loadBuffer method exists as of Flutter greater than 3.1

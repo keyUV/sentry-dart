@@ -9,6 +9,8 @@ import 'sentry_options.dart';
 import 'sentry_span_interface.dart';
 import 'sentry_tracer.dart';
 
+typedef _OnScopeObserver = Future<void> Function(ScopeObserver observer);
+
 /// Scope data to be sent with the event
 class Scope {
   /// How important this event is.
@@ -19,34 +21,22 @@ class Scope {
   /// The name of the transaction which generated this event,
   /// for example, the route name: `"/users/<username>/"`.
   String? get transaction {
-    return ((_span is SentryTracer) ? (_span as SentryTracer?)?.name : null) ??
+    return ((span is SentryTracer) ? (span as SentryTracer?)?.name : null) ??
         _transaction;
   }
 
   set transaction(String? transaction) {
     _transaction = transaction;
 
-    if (_transaction != null && _span != null) {
+    if (_transaction != null && span != null) {
       final currentTransaction =
-          (_span is SentryTracer) ? (_span as SentryTracer?) : null;
+          (span is SentryTracer) ? (span as SentryTracer?) : null;
       currentTransaction?.name = _transaction!;
     }
   }
 
-  ISentrySpan? _span;
-
   /// Returns active transaction or null if there is no active transaction.
-  ISentrySpan? get span => _span;
-
-  set span(ISentrySpan? span) {
-    _span = span;
-
-    if (_span != null) {
-      final currentTransaction =
-          (_span is SentryTracer) ? (_span as SentryTracer?) : null;
-      _transaction = currentTransaction?.name ?? _transaction;
-    }
-  }
+  ISentrySpan? span;
 
   SentryUser? _user;
 
@@ -242,7 +232,7 @@ class Scope {
   Future<void> clear() async {
     clearAttachments();
     level = null;
-    _span = null;
+    span = null;
     _transaction = null;
     _fingerprint = [];
     _tags.clear();
@@ -297,7 +287,7 @@ class Scope {
     dynamic hint,
   }) async {
     event = event.copyWith(
-      transaction: event.transaction ?? _transaction,
+      transaction: event.transaction ?? transaction,
       user: _mergeUsers(user, event.user),
       breadcrumbs: (event.breadcrumbs?.isNotEmpty ?? false)
           ? event.breadcrumbs
@@ -327,10 +317,10 @@ class Scope {
       }
     });
 
-    final span = _span;
-    if (event.contexts.trace == null && span != null) {
-      event.contexts.trace = span.context.toTraceContext(
-        sampled: span.samplingDecision?.sampled,
+    final newSpan = span;
+    if (event.contexts.trace == null && newSpan != null) {
+      event.contexts.trace = newSpan.context.toTraceContext(
+        sampled: newSpan.samplingDecision?.sampled,
       );
     }
 
@@ -389,24 +379,26 @@ class Scope {
       email: eventUser?.email,
       ipAddress: eventUser?.ipAddress,
       username: eventUser?.username,
-      extras: _mergeUserExtra(eventUser?.extras, scopeUser.extras),
+      data: _mergeUserData(eventUser?.data, scopeUser.data),
+      // ignore: deprecated_member_use_from_same_package
+      extras: _mergeUserData(eventUser?.extras, scopeUser.extras),
     );
   }
 
   /// If the User on the scope and the user of an event have extra entries with
   /// the same key, the event user extra will be kept.
-  Map<String, dynamic> _mergeUserExtra(
-    Map<String, dynamic>? eventExtra,
-    Map<String, dynamic>? scopeExtra,
+  Map<String, dynamic> _mergeUserData(
+    Map<String, dynamic>? eventData,
+    Map<String, dynamic>? scopeData,
   ) {
     final map = <String, dynamic>{};
-    if (eventExtra != null) {
-      map.addAll(eventExtra);
+    if (eventData != null) {
+      map.addAll(eventData);
     }
-    if (scopeExtra == null) {
+    if (scopeData == null) {
       return map;
     }
-    for (var value in scopeExtra.entries) {
+    for (var value in scopeData.entries) {
       map.putIfAbsent(value.key, () => value.value);
     }
     return map;
@@ -418,7 +410,7 @@ class Scope {
       ..level = level
       ..fingerprint = List.from(fingerprint)
       .._transaction = _transaction
-      .._span = _span;
+      ..span = span;
 
     clone._setUserSync(user);
 
@@ -455,8 +447,7 @@ class Scope {
     return clone;
   }
 
-  Future<void> _callScopeObservers(
-      Future<void> Function(ScopeObserver) action) async {
+  Future<void> _callScopeObservers(_OnScopeObserver action) async {
     if (_options.enableScopeSync) {
       for (final scopeObserver in _options.scopeObservers) {
         await action(scopeObserver);

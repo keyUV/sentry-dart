@@ -34,9 +34,13 @@ void main() {
 
   test('SentryLogger sets a diagnostic logger', () {
     final options = SentryOptions(dsn: fakeDsn);
+    // ignore: deprecated_member_use_from_same_package
+    expect(options.logger, noOpLogger);
+    // ignore: deprecated_member_use_from_same_package
     options.logger = dartLogger;
 
-    expect(false, options.logger == noOpLogger);
+    // ignore: deprecated_member_use_from_same_package
+    expect(options.logger, isNot(noOpLogger));
   });
 
   test('tracesSampler is null by default', () {
@@ -90,5 +94,11 @@ void main() {
     final options = SentryOptions.empty();
 
     expect(options.tracePropagationTargets, ['.*']);
+  });
+
+  test('SentryOptions has default idleTimeout', () {
+    final options = SentryOptions.empty();
+
+    expect(options.idleTimeout?.inSeconds, Duration(seconds: 3).inSeconds);
   });
 }

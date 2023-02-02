@@ -1,4 +1,7 @@
+import 'package:meta/meta.dart';
 import 'package:sentry/sentry.dart';
+
+import 'renderer/renderer.dart';
 
 /// This class adds options which are only availble in a Flutter environment.
 /// Note that some of these options require native Sentry integration, which is
@@ -176,6 +179,31 @@ class SentryFlutterOptions extends SentryOptions {
   /// you want to set the end time of app startup manually using
   /// [SentryFlutter.setAppStartEnd].
   bool autoAppStart = true;
+
+  /// Automatically attaches a screenshot when capturing an error or exception.
+  ///
+  /// Requires adding the [SentryScreenshotWidget] to the widget tree.
+  /// Example:
+  /// runApp(SentryScreenshotWidget(child: App()));
+  /// The [SentryScreenshotWidget] has to be the root widget of the app.
+  bool attachScreenshot = false;
+
+  /// Enable or disable automatic breadcrumbs for User interactions Using [Listener]
+  ///
+  /// Requires adding the [SentryUserInteractionWidget] to the widget tree.
+  /// Example:
+  /// runApp(SentryUserInteractionWidget(child: App()));
+  bool enableUserInteractionBreadcrumbs = true;
+
+  /// Enables the Auto instrumentation for user interaction tracing.
+  ///
+  /// Requires adding the [SentryUserInteractionWidget] to the widget tree.
+  /// Example:
+  /// runApp(SentryUserInteractionWidget(child: App()));
+  bool enableUserInteractionTracing = false;
+
+  @internal
+  late RendererWrapper rendererWrapper = RendererWrapper();
 
   /// By using this, you are disabling native [Breadcrumb] tracking and instead
   /// you are just tracking [Breadcrumb]s which result from events available

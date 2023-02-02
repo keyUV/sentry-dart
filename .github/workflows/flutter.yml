@@ -10,6 +10,14 @@ on:
       - 'dio/**'
 
 jobs:
+  cancel-previous-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@b173b6ec0100793626c2d9e6b90435061f4fc3e5 # pin@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
   build:
     name: ${{ matrix.target }} | ${{ matrix.os }} | ${{ matrix.sdk }}
     runs-on: ${{ matrix.os }}
@@ -66,7 +74,7 @@ jobs:
           sudo apt install -y network-manager upower
         if: matrix.os == 'ubuntu-latest'
 
-      - uses: subosito/flutter-action@1e6ee87cb840500837bcd50a667fb28815d8e310 # pin@v2
+      - uses: subosito/flutter-action@dbf1fa04f4d2e52c33185153d06cdb5443aa189d # pin@v2
         with:
           channel: ${{ matrix.sdk }}
 
@@ -81,7 +89,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           cd flutter
-          flutter test --platform chrome --test-randomize-ordering-seed=random
+          flutter test --platform chrome --test-randomize-ordering-seed=random --exclude-tags canvasKit
+          flutter test --platform chrome --test-randomize-ordering-seed=random --tags canvasKit --web-renderer canvaskit
 
       - name: Test VM with coverage
         if: runner.os != 'macOS'
@@ -89,14 +98,14 @@ jobs:
           cd flutter
           flutter test --coverage --test-randomize-ordering-seed=random
 
-      #   remove comment after https://github.com/codecov/codecov-action/issues/600
-      # - uses: codecov/codecov-action@v2
-      #   if: runner.os == 'Linux' && matrix.sdk == 'stable' && matrix.target == 'linux'
-      #   with:
-      #     name: sentry_flutter
-      #     file: ./flutter/coverage/lcov.info
+      - uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
+        if: runner.os == 'Linux' && matrix.sdk == 'stable' && matrix.target == 'linux'
+        with:
+          name: sentry_flutter
+          file: ./flutter/coverage/lcov.info
+          functionalities: 'search' # remove after https://github.com/codecov/codecov-action/issues/600
 
-      - uses: VeryGoodOpenSource/very_good_coverage@feed99cc060453828a8f12e74b404baace8e4502 # pin@v1.2.1
+      - uses: VeryGoodOpenSource/very_good_coverage@84e5b54ab888644554e5573dca87d7f76dec9fb3 # pin@v2.0.0
         if: runner.os == 'Linux' && matrix.sdk == 'stable' && matrix.target == 'linux'
         with:
           path: './flutter/coverage/lcov.info'
@@ -132,42 +141,10 @@ jobs:
           esac
 
   analyze:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@1e6ee87cb840500837bcd50a667fb28815d8e310 # pin@v2
-      - run: |
-          cd flutter
-          flutter pub get
-          flutter format -n --set-exit-if-changed ./
-          flutter analyze
-
-  package-analysis:
-    # `axel-op/dart-package-analyzer` is using `flutter pub upgrade` instead of `get`,
-    # which ignores pubspec.yaml `dependency_overrides`. Because of that, all `release/*` branches are failing,
-    # because the package cannot find the "about to be released" version of our sentry-dart package that it depends on.
-    if: ${{ !startsWith(github.ref, 'refs/heads/release/') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v3
-      - uses: axel-op/dart-package-analyzer@7a6c3c66bce78d82b729a1ffef2d9458fde6c8d2 # pin@v3
-        id: analysis
-        with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          relativePath: flutter/
-      - name: Check scores
-        env:
-          TOTAL: ${{ steps.analysis.outputs.total }}
-          TOTAL_MAX: ${{ steps.analysis.outputs.total_max }}
-        run: |
-          PERCENTAGE=$(( $TOTAL * 100 / $TOTAL_MAX ))
-          if (( $PERCENTAGE < 90 ))
-          then
-            echo Score too low!
-            exit 1
-          fi
+    uses: ./.github/workflows/analyze.yml
+    with:
+      package: flutter
+      sdk: flutter
 
   pod-lint:
     runs-on: macos-latest
@@ -187,6 +164,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: norio-nomura/action-swiftlint@9f4dcd7fd46b4e75d7935cf2f4df406d5cae3684 # pin@3.2.1
+        with:
+          args: --strict
 
   ktlint:
     runs-on: ubuntu-latest
@@ -202,6 +181,7 @@ jobs:
           github_token: ${{ secrets.github_token }}
           reporter: github-pr-review
           android: true
+          fail_on_error: true
 
   detekt:
     runs-on: ubuntu-latest
@@ -210,4 +190,4 @@ jobs:
       # To recreate baseline run: detekt -i flutter/android,flutter/example/android -b flutter/config/detekt-bl.xml -cb
       - uses: natiginfo/action-detekt-all@e01de6ff0eef7c24131e8a133bf598cfac6ceeab # pin@1.21.0
         with:
-          args: -i flutter/android,flutter/example/android --baseline flutter/config/detekt-bl.xml
+          args: -i flutter/android,flutter/example/android --baseline flutter/config/detekt-bl.xml --jvm-target 1.8 --build-upon-default-config --all-rules

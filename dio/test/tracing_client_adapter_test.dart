@@ -2,8 +2,6 @@
 // The lint above is okay, because we're using another Sentry package
 
 import 'package:dio/dio.dart';
-import 'package:http/http.dart';
-import 'package:mockito/mockito.dart';
 import 'package:sentry/sentry.dart';
 import 'package:sentry/src/sentry_tracer.dart';
 import 'package:sentry_dio/src/tracing_client_adapter.dart';
@@ -121,6 +119,19 @@ void main() {
       );
     });
 
+    test('captured span do not add headers if NoOp', () async {
+      final sut = fixture.getSut(
+        client: fixture.getClient(statusCode: 200, reason: 'OK'),
+      );
+      await fixture._hub
+          .configureScope((scope) => scope.span = NoOpSentrySpan());
+
+      final response = await sut.get<dynamic>(requestOptions);
+
+      expect(response.headers['baggage'], null);
+      expect(response.headers['sentry-trace'], null);
+    });
+
     test('do not throw if no span bound to the scope', () async {
       final sut = fixture.getSut(
         client: fixture.getClient(statusCode: 200, reason: 'OK'),
@@ -139,8 +150,6 @@ MockHttpClientAdapter createThrowingClient() {
     },
   );
 }
-
-class CloseableMockClient extends Mock implements BaseClient {}
 
 class Fixture {
   final _options = SentryOptions(dsn: fakeDsn);

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dart:io' if (dart.library.html) 'dart:html';
+
 import 'package:logging/logging.dart';
 import 'package:dio/dio.dart';
 
@@ -12,14 +14,37 @@ const String _exampleDsn =
     'https://e85b375ffb9f43cf8bdf9787768149e0@o447951.ingest.sentry.io/5428562';
 
 Future<void> main() async {
-  await SentryFlutter.init(
-    (options) {
-      options.dsn = _exampleDsn;
-      options.addIntegration(LoggingIntegration());
-    },
-    // Init your App.
-    appRunner: () => runApp(const MyApp()),
-  );
+  await setupSentry(() => runApp(
+        SentryScreenshotWidget(
+          child: SentryUserInteractionWidget(
+            child: DefaultAssetBundle(
+              bundle: SentryAssetBundle(enableStructuredDataTracing: true),
+              child: const MyApp(),
+            ),
+          ),
+        ),
+      ));
+}
+
+Future<void> setupSentry(AppRunner appRunner) async {
+  await SentryFlutter.init((options) {
+    options.dsn = _exampleDsn;
+    options.tracesSampleRate = 1.0;
+    options.attachThreads = true;
+    options.enableWindowMetricBreadcrumbs = true;
+    options.addIntegration(LoggingIntegration());
+    options.sendDefaultPii = true;
+    options.reportSilentFlutterErrors = true;
+    options.enableNdkScopeSync = true;
+    options.enableUserInteractionTracing = true;
+    options.attachScreenshot = true;
+    // We can enable Sentry debug logging during development. This is likely
+    // going to log too much for your app, but can be useful when figuring out
+    // configuration issues, e.g. finding out why your events are not uploaded.
+    options.debug = true;
+  },
+      // Init your App.
+      appRunner: appRunner);
 }
 
 class MyApp extends StatelessWidget {
@@ -70,6 +95,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _incrementCounter() async {
     setState(() async {
+      final transaction = Sentry.startTransaction(
+        'incrementCounter',
+        'task',
+        bindToScope: true,
+      );
+
       // This call to setState tells the Flutter framework that something has
       // changed in this State, which causes it to rerun the build method below
       // so that the display can reflect the updated values. If we changed
@@ -78,12 +109,18 @@ class _MyHomePageState extends State<MyHomePage> {
       _counter++;
 
       final dio = Dio();
-      dio.addSentry();
+      dio.addSentry(captureFailedRequests: true);
       final log = Logger('_MyHomePageState');
+
       try {
-        await dio.get<String>('https://flutter.dev/');
+        final file = File('response.txt');
+        final response = await dio.get<String>('https://flutter.dev/');
+        await file.writeAsString(response.data ?? 'no response');
+
+        await transaction.finish(status: SpanStatus.ok());
       } catch (exception, stackTrace) {
         log.info(exception.toString(), exception, stackTrace);
+        await transaction.finish(status: SpanStatus.internalError());
       }
     });
   }
