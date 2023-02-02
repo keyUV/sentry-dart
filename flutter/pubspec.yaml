@@ -15,8 +15,10 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   sentry:
-    path: ../dart
-  package_info_plus: ^1.0.0
+    git:
+      url: https://github.com/andre-uv/sentry-dart.git
+      path: dart
+  package_info_plus: ^1.3.0
   meta: ^1.3.0
 
 dev_dependencies:
