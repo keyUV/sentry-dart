@@ -464,6 +464,7 @@ class SentryFlutterPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     event.setTag("event.environment", environment)
   }
 
+  @Suppress("NestedBlockDepth")
   private fun addPackages(event: SentryEvent, sdk: SdkVersion?) {
     event.sdk?.let {
       if (it.name == flutterSdk) {

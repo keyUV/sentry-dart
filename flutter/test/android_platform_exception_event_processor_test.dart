@@ -20,7 +20,6 @@ void main() {
       buildSignature: '',
       packageName: 'io.sentry.samples',
       version: '1.2.3',
-      installerStore: null,
     );
   });
 
